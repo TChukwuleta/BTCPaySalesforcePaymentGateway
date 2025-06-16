@@ -1,8 +1,6 @@
 public abstract class AbstractTransactionService {
     protected final commercepayments.SalesforceResultCode SUCCESS_SALESFORCE_RESULT_CODE = commercepayments.SalesforceResultCode.SUCCESS;
     protected final commercepayments.SalesforceResultCode DECLINE_SALESFORCE_RESULT_CODE = commercepayments.SalesforceResultCode.DECLINE;
-    protected final commercepayments.SalesforceResultCode PENDING_SALESFORCE_RESULT_CODE = commercepayments.SalesforceResultCode.PENDING;
-    protected final commercepayments.SalesforceResultCode CANCELLED_SALESFORCE_RESULT_CODE = commercepayments.SalesforceResultCode.CANCELLED;
     protected commercepayments.paymentGatewayContext gatewayContext;
 
     public AbstractTransactionService(commercepayments.paymentGatewayContext gatewayContext){
@@ -56,23 +54,17 @@ public abstract class AbstractTransactionService {
 	*/
     protected commercepayments.SalesforceResultCodeInfo getSalesforceResultCodeInfo(String resultCode) {
         if (resultCode == null) {
-            return new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.ERROR);
+            return new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.SystemError);
         }
         switch on resultCode {
-            when SUCCESS_SALESFORCE_RESULT_CODE.name() {
+            when 'SUCCESS' { 
                 return new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.SUCCESS);
             }
-            when DECLINE_SALESFORCE_RESULT_CODE.name() {
+            when 'DECLINE' {
                 return new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.DECLINE);
             }
-            when PENDING_SALESFORCE_RESULT_CODE.name() {
-                return new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.PENDING);
-            }
-            when CANCELLED_SALESFORCE_RESULT_CODE.name() {
-                return new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.CANCELLED);
-            }
             when else {
-                return new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.ERROR);
+                return new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.ValidationError);
             }
         }
     }

@@ -11,7 +11,7 @@ public with sharing class CaptureTransactionService extends AbstractTransactionS
         PaymentAuthorization authObject = getAuthObjectForStatusCheck(captureRequest.paymentAuthorizationId);
         String invoiceId = extractInvoiceId(authObject.GatewayRefDetails);
         if (invoiceId == null) {
-            throw new PaymentGatewayException('No BTCPay invoice ID found in authorization record');
+            throw new IllegalArgumentException('No BTCPay invoice ID found in authorization record');
         }
         String storeId = getBTCPayStoreId();
         String endpoint = BTCPAY_ENDPOINT_INVOICE_STATUS
@@ -40,10 +40,12 @@ public with sharing class CaptureTransactionService extends AbstractTransactionS
             captureResponse.setGatewayDate(System.now());
             captureResponse.setGatewayReferenceNumber((String) responseData.get('id'));
             captureResponse.setGatewayReferenceDetails(JSON.serialize(parsed));
-            String amountStr = (String) responseMap.get('amount');
+            
+            String amountStr = (String) responseData.get('amount');
             if (amountStr != null) {
-                captureResponse.setAmount(Decimal.valueOf(amountStr));
+                captureResponse.setAmount(double.valueOf(amountStr));
             }
+            String invoiceStatus = String.valueOf(responseData.get('status'));
             switch on invoiceStatus {
                 when 'New' {
                     captureResponse.setGatewayResultCodeDescription('Invoice created but pending payment');
@@ -67,8 +69,8 @@ public with sharing class CaptureTransactionService extends AbstractTransactionS
                 }
             }
         } else {
-            String message = responseMap.get('message') != null ? 
-                (String) responseMap.get('message') : 'Failed to check BTCPay invoice status';
+            String message = responseData.get('message') != null ? 
+                (String) responseData.get('message') : 'Failed to check BTCPay invoice status';
             return new commercepayments.GatewayErrorResponse(statusCode, message);
         }
         return captureResponse;

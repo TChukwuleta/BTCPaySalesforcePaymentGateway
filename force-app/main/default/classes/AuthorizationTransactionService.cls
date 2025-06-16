@@ -18,10 +18,16 @@ public with sharing class AuthorizationTransactionService extends AbstractTransa
     public override commercepayments.GatewayResponse buildResponse(HttpResponse response){
         commercepayments.AuthorizationResponse authResponse = new commercepayments.AuthorizationResponse();
         String statusCode = String.valueOf(response.getStatusCode());
+        String jsonResponse = response.getBody();
         Map<String, Object> responseData = (Map<String, Object>) JSON.deserializeUntyped(jsonResponse);
         if (statusCode == '200' || statusCode == '201') {
             Map<String, String> parsed = new Map<String, String>();
-            if (jsonResponse == null) return parsed;
+            if (jsonResponse == null) {
+                authResponse.setGatewayResultCode('500');
+                authResponse.setGatewayResultCodeDescription('Empty response from BTCPay');
+                authResponse.setSalesforceResultCodeInfo(getSalesforceResultCodeInfo('DECLINE'));
+                return authResponse;
+            }
         
             if (responseData.containsKey('id')) parsed.put('invoice_id', String.valueOf(responseData.get('id')));
             if (responseData.containsKey('status')) parsed.put('status', String.valueOf(responseData.get('status')));
@@ -29,17 +35,20 @@ public with sharing class AuthorizationTransactionService extends AbstractTransa
             if (responseData.containsKey('amount')) parsed.put('amount', String.valueOf(responseData.get('amount')));
             if (responseData.containsKey('currency')) parsed.put('currency', String.valueOf(responseData.get('currency')));
 
+            commercepayments.AuthorizationRequest authRequest = (commercepayments.AuthorizationRequest)gatewayContext.getPaymentRequest();
+            
+
             authResponse.setGatewayReferenceDetails(JSON.serialize(parsed));
             authResponse.setGatewayResultCode(statusCode);
             authResponse.setGatewayDate(System.now());
             authResponse.setAmount(authRequest.amount);
             authResponse.setGatewayResultCodeDescription('BTCPay invoice created - awaiting payment');
             authResponse.setGatewayReferenceNumber((String) responseData.get('id'));
-            authResponse.setSalesforceResultCodeInfo(getSalesforceResultCodeInfo('PENDING'));
-            commercepayments.AuthorizationRequest authRequest = (commercepayments.AuthorizationRequest)gatewayContext.getPaymentRequest();
+            // There is nothjing like pending for the salesforce status code, so I would need a solution.
+            //authResponse.setSalesforceResultCodeInfo(getSalesforceResultCodeInfo('PENDING'));
         } else {
-            String message = responseMap.get('message') != null ? 
-                (String) responseMap.get('message') : 'Failed to create BTCPay invoice';
+            String message = responseData.get('message') != null ? 
+                (String) responseData.get('message') : 'Failed to create BTCPay invoice';
             return new commercepayments.GatewayErrorResponse(statusCode, message);
         }
         return authResponse;
@@ -47,7 +56,7 @@ public with sharing class AuthorizationTransactionService extends AbstractTransa
     
     private String buildAuthRequestBody(commercepayments.AuthorizationRequest authRequest) {
         if (authRequest.amount == null) {
-            throw new Exception('Required field missing: Amount');
+            throw new IllegalArgumentException('Required field missing: Amount');
         }
         String currencyIso = authRequest.currencyIsoCode;
         if (currencyIso == null) {
@@ -64,7 +73,8 @@ public with sharing class AuthorizationTransactionService extends AbstractTransa
         jsonGeneratorInstance.writeStartObject();
         jsonGeneratorInstance.writeStringField('currency', currencyIso);
         jsonGeneratorInstance.writeStringField('orderId', orderId);
-        jsonGeneratorInstance.writeStringField('amount', String.valueOf(authRequest.amount.setScale(2)));
+        Decimal amountDecimal = Decimal.valueOf(authRequest.amount);
+        jsonGeneratorInstance.writeStringField('amount', String.valueOf(amountDecimal.setScale(2, RoundingMode.HALF_UP)));
         jsonGeneratorInstance.writeStringField('merchant_ref', getMerchantRef(authRequest.additionalData));
         if (authRequest?.additionalData != null) {
             if (authRequest.additionalData.containsKey('buyerEmail')) {
