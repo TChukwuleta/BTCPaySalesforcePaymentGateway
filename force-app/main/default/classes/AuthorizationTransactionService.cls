@@ -5,7 +5,7 @@ public with sharing class AuthorizationTransactionService extends AbstractTransa
         super(gatewayContext);
     }
 
-    public override HttpRequest buildRequest(){
+    public override HttpRequest buildRequest(commercepayments.paymentGatewayContext gatewayContext){
         HttpRequest req = new HttpRequest();
         String storeId = getBTCPayStoreId();
         req.setEndpoint(BTCPAY_ENDPOINT_INVOICES.replace('{storeId}', storeId));

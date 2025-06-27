@@ -1,20 +1,20 @@
 public abstract class AbstractTransactionService {
     protected final commercepayments.SalesforceResultCode SUCCESS_SALESFORCE_RESULT_CODE = commercepayments.SalesforceResultCode.SUCCESS;
     protected final commercepayments.SalesforceResultCode DECLINE_SALESFORCE_RESULT_CODE = commercepayments.SalesforceResultCode.DECLINE;
+    private static final String CREATE_BTCPAY_INVOICE_PATH = '/stores/{0}/plugin/salesforce/public/invoices/create';
     protected commercepayments.paymentGatewayContext gatewayContext;
 
     public AbstractTransactionService(commercepayments.paymentGatewayContext gatewayContext){
             this.gatewayContext = gatewayContext;
     }
 
-    public abstract HttpRequest buildRequest();
+    public abstract HttpRequest buildRequest(commercepayments.paymentGatewayContext gatewayContext);
 
     public abstract commercepayments.GatewayResponse buildResponse(HttpResponse response);
 
     public commercepayments.GatewayResponse execute() {
         HttpRequest req;
         try {
-            //Building a new request
             req = buildRequest();
         } catch(Exception e) {
             return new commercepayments.GatewayErrorResponse('400', e.getMessage());
@@ -22,13 +22,11 @@ public abstract class AbstractTransactionService {
         commercepayments.PaymentsHttp http = new commercepayments.PaymentsHttp();
         HttpResponse res = null;
         try {
-            //Sending the request
             res = http.send(req);
         } catch(CalloutException ce) {
             return new commercepayments.GatewayErrorResponse('500', ce.getMessage());
         }
         try {
-            //Parsing the response from gateway
             return buildResponse(res);
         } catch(Exception e) {
             return new commercepayments.GatewayErrorResponse('400', 'Something went wrong in the Gateway Adapter : ' + e.getMessage());
@@ -38,6 +36,24 @@ public abstract class AbstractTransactionService {
     protected void setAuthorizationHeaders(HttpRequest req){
         req.setHeader('Content-Type', 'application/json');
     }
+
+    protected void buildInvoiceCreationUrl(HttpRequest req) {
+        String baseUrl = getBTCPayServerUrl();
+        String storeId = getBTCPayStoreId();
+        String fullUrl = baseUrl + String.format(CREATE_BTCPAY_INVOICE_PATH, new String[] { storeId });
+        req.setEndpiont(fullUrl);
+    }
+    
+    protected String getBTCPayServerUrl() {
+        BTCPay_Settings__c settings = BTCPay_Settings__c.getOrgDefaults();
+        return settings?.Server_URL__c;
+    }
+
+    protected String getBTCPayStoreId() {
+        BTCPay_Settings__c settings = BTCPay_Settings__c.getOrgDefaults();
+        return settings?.Store_ID__c;
+    }
+
 
     /**
 	* Function to get Salesforce Result Code Info
