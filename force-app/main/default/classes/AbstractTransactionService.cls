@@ -13,7 +13,7 @@ public abstract class AbstractTransactionService {
     public abstract commercepayments.GatewayResponse buildResponse(HttpResponse response);
 
     public commercepayments.GatewayResponse execute() {
-        HttpRequest req = buildRequest();
+        HttpRequest req = buildRequest(gatewayContext);
         commercepayments.PaymentsHttp http = new commercepayments.PaymentsHttp();
         HttpResponse res = null;
         try {
@@ -36,16 +36,16 @@ public abstract class AbstractTransactionService {
         String baseUrl = getBTCPayServerUrl();
         String storeId = getBTCPayStoreId();
         String fullUrl = baseUrl + String.format(CREATE_BTCPAY_INVOICE_PATH, new String[] { storeId });
-        req.setEndpiont(fullUrl);
+        req.setEndpoint(fullUrl);
     }
     
     protected String getBTCPayServerUrl() {
-        BTCPay_Settings__c settings = BTCPay_Settings__c.getOrgDefaults();
+        BTCPay_Server_Settings__c settings = BTCPay_Server_Settings__c.getOrgDefaults();
         return settings?.Server_URL__c;
     }
 
     protected String getBTCPayStoreId() {
-        BTCPay_Settings__c settings = BTCPay_Settings__c.getOrgDefaults();
+        BTCPay_Server_Settings__c settings = BTCPay_Server_Settings__c.getOrgDefaults();
         return settings?.Store_ID__c;
     }
 
