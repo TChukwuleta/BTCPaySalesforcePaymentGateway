@@ -37,8 +37,9 @@ public with sharing class CaptureTransactionService extends AbstractTransactionS
         }
         captureResponse.setGatewayResultCode(statusCode);
         captureResponse.setGatewayDate(System.now());
-        captureResponse.setAsync(True);
+        captureResponse.setAsync(true);
         captureResponse.setGatewayMessage(checkoutLink);
+        captureResponse.setSalesforceResultCodeInfo(new commercepayments.SalesforceResultCodeInfo(commercepayments.SalesforceResultCode.Success));
         captureResponse.setGatewayReferenceNumber(invoiceId);
         captureResponse.setGatewayResultCodeDescription('Bitcoin payment pending');
         captureResponse.setGatewayReferenceDetails(JSON.serialize(parsed));
@@ -50,18 +51,21 @@ public with sharing class CaptureTransactionService extends AbstractTransactionS
             Boolean IS_MULTICURRENCY_ORG = UserInfo.isMultiCurrencyOrganization();
             PaymentAuthorization authObject = getAuthObjectForCapture(captureRequest.paymentAuthorizationId,IS_MULTICURRENCY_ORG);
         
-            Map<String, Object> invoiceRequest = new Map<String, Object>();
-            invoiceRequest.put('amount', String.ValueOf((captureRequest.amount*100.0).intValue()));
             Map<String, Object> refDetailsMap = (Map<String, Object>) JSON.deserializeUntyped(authObject.GatewayRefDetails);
             String transactionId = (String)refDetailsMap.get('transaction_id');
-            invoiceRequest.put('orderId', transactionId);
-            invoiceRequest.put('itemDesc', 'Payment for Transaction Id: ' + transactionId);
+            JSONGenerator jsonGeneratorInstance = JSON.createGenerator(true);
+            jsonGeneratorInstance.writeStartObject();
+            jsonGeneratorInstance.writeStringField('amount', String.ValueOf((captureRequest.amount*100.0).intValue()));
+            jsonGeneratorInstance.writeStringField('originalReference', authObject.GatewayRefNumber);
+            jsonGeneratorInstance.writeStringField('orderId', transactionId);
+            jsonGeneratorInstance.writeStringField('itemDesc', 'Payment for Transaction Id: ' + transactionId);
             if (IS_MULTICURRENCY_ORG) {
-                invoiceRequest.put('currency', authObject.get('CurrencyIsoCode').toString());
+                jsonGeneratorInstance.writeStringField('currency', authObject.get('CurrencyIsoCode').toString());
             } else {
-                invoiceRequest.put('currency', UserInfo.getDefaultCurrency());
+                jsonGeneratorInstance.writeStringField('currency', UserInfo.getDefaultCurrency());
             }
-            return JSON.serialize(invoiceRequest);
+            jsonGeneratorInstance.writeEndObject();
+            return jsonGeneratorInstance.getAsString();
         } catch (Exception e) {
             System.debug('Error building BTCPay invoice request: ' + e.getMessage());
             throw e;
