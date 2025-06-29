@@ -33,47 +33,45 @@ public with sharing class BTCPayServerGatewayProvider implements commercepayment
             // if (!verifyBTCPaySignature(sigHeader, requestBody.toString(), webhookSecret)) {
             //     throw new commercepayments.PaymentGatewayException('Invalid signature');
             // }
-            if (!verifyBTCPaySignature(request, headers)) {
-                System.debug('BTCPay webhook signature verification failed');
-                return new commercepayments.GatewayNotificationResponse(
-                    commercepayments.GatewayNotificationResponse.NotificationStatus.ERROR,
-                    'BTCPay webhook signature verification failed'
-                );
-            }
-
+            // if (!verifyBTCPaySignature(request, headers)) {
+            //     System.debug('BTCPay webhook signature verification failed');
+            //     return new commercepayments.GatewayNotificationResponse(
+            //         commercepayments.GatewayNotificationResponse.NotificationStatus.ERROR,
+            //         'BTCPay webhook signature verification failed'
+            //     );
+            // }
             System.debug('BTCPay notification received: ' + request.toString());
 
             Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(requestBody.toString());
             String eventType = (String) payload.get('type');
-            Map<String, Object> data = (Map<String, Object>) payload.get('data');
             String invoiceId = (String) payload.get('invoiceId');
-            String status = (String) data.get('status');
-            String storeId = (String) data.get('storeId');
-            String amountPaidStr = (String) data.get('amountPaid');
+            String status = (String) payload.get('status');
+            String storeId = (String) payload.get('storeId');
+            String amountPaidStr = (String) payload.get('amountPaid');
             Decimal amount = Decimal.valueOf(amountPaidStr);
             
-            commercepayments.BaseNotification notification;
             commercepayments.NotificationStatus notificationStatus = null;
             if ('InvoiceSettled'.equals(eventType) || 'InvoiceProcessing'.equals(eventType)) {
                 notificationStatus = commercepayments.NotificationStatus.Success;
-                notification = new commercepayments.CaptureNotification();
             } else if ('InvoiceExpired'.equals(eventType) || 'InvoiceInvalid'.equals(eventType)) {
                 notificationStatus = commercepayments.NotificationStatus.Failed;
-                notification = new commercepayments.CaptureNotification(); // Still use capture for failed payment, why?
             } else {
                 throw new commercepayments.PaymentGatewayException('Unhandled event type: ' + eventType);
             }
-
-            if (notification != null) {
-                notification.setStatus(notificationStatus);
-                notification.setGatewayReferenceNumber(invoiceId);
-                // Is this necessary?
-                Double amount = getInvoiceAmount(invoiceId);
-                if (amount != null) {
-                    notification.setAmount(amount);
-                }
+            commercepayments.BaseNotification notification = new commercepayments.CaptureNotification();
+            notification.setStatus(notificationStatus);
+            notification.setGatewayReferenceNumber(invoiceId);
+            notification.setAmount(amount);
+            commercepayments.NotificationSaveResult saveResult = commercepayments.NotificationClient.record(notification);
+            if (saveResult.isSuccess()) {
+                system.debug('Notification accepted by platform');
+            } else {
+                system.debug('Errors in the result '+ Blob.valueOf(saveResult.getErrorMessage()));
             }
-            return new commercepayments.GatewayNotificationResponse(notification);
+            commercepayments.GatewayNotificationResponse gnr = new commercepayments.GatewayNotificationResponse();
+            gnr.setStatusCode(200);
+            gnr.setResponseBody(Blob.valueOf('[accepted]'));
+            return gnr;
         } catch (Exception e) {
             System.debug('Error processing BTCPay notification: ' + e.getMessage());
             return new commercepayments.GatewayNotificationResponse(

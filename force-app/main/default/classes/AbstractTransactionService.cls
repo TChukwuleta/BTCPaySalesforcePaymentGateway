@@ -13,12 +13,7 @@ public abstract class AbstractTransactionService {
     public abstract commercepayments.GatewayResponse buildResponse(HttpResponse response);
 
     public commercepayments.GatewayResponse execute() {
-        HttpRequest req;
-        try {
-            req = buildRequest();
-        } catch(Exception e) {
-            return new commercepayments.GatewayErrorResponse('400', e.getMessage());
-        }
+        HttpRequest req = buildRequest();
         commercepayments.PaymentsHttp http = new commercepayments.PaymentsHttp();
         HttpResponse res = null;
         try {
